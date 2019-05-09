@@ -1,5 +1,5 @@
-from .pickle import pickle as _pickle
-from .pickle import unpickle as _unpickle
+from .pickle_function import pickle as _pickle
+from .pickle_function import unpickle as _unpickle
 from .individual_functions import *
 
 

@@ -1,5 +1,5 @@
-from .Path import Path
+from .path_class import Path
 from .individual_functions import *
-from .pickle import pickle, unpickle
-from .Cache import Cache, make_cached, Dictionary
-from .HardFolder import HardFolder
+from .pickle_function import pickle, unpickle
+from .cache_class import Cache, make_cached, Dictionary
+from .hard_folder_class import HardFolder

@@ -1,5 +1,5 @@
-from .Path import Path
-from .hash import hash
+from .path_class import Path
+from slytherin.hash import hash_object
 from datetime import datetime
 from pickle import PicklingError
 
@@ -11,10 +11,10 @@ class HardFolder:
 		self._path.make_directory(ignore_if_exists=True)
 
 	def _get_path(self, key, method='pickle'):
-		return self._path + f'{hash(key, base=32)}_{method}.riddle'
+		return self._path + f'{hash_object(key, base=32)}_{method}.riddle'
 
 	def _get_metadata_path(self, key):
-		return self._path + f'{hash(key, base=32)}_metadata.riddle'
+		return self._path + f'{hash_object(key, base=32)}_metadata.riddle'
 
 	def __contains__(self, item):
 		pickle_exists = self._get_path(key=item, method='pickle').exists()
