@@ -1,5 +1,6 @@
 import pickle as _pickle
 import dill as _dill
+import warnings
 
 def pickle(obj, path, method='pickle', mode='wb', echo=0):
 	echo = max(0, echo)
@@ -10,7 +11,8 @@ def pickle(obj, path, method='pickle', mode='wb', echo=0):
 			else:
 				_pickle.dump(obj=obj, file=output_file, protocol=_pickle.HIGHEST_PROTOCOL)
 		except Exception as e:
-			raise Exception(f'Error in pickling object: {obj} to "{path}" using the {method} method!') from e
+			warnings.warn(f'Error in pickling object: {obj} to "{path}" using the {method} method!')
+			raise e from e
 
 	if echo:
 		print(f'Pickled a {type(obj)} at "{path}"')
@@ -25,7 +27,8 @@ def unpickle(path, method='pickle', mode='rb', echo=0):
 			else:
 				obj = _pickle.load(file=input_file)
 		except Exception as e:
-			raise Exception(f'Error in unpickling "{path}" using the {method} method!') from e
+			warnings.warn(f'Error in unpickling "{path}" using the {method} method!')
+			raise e from e
 
 	if echo:
 		print(f'Unpickled a {type(obj)} from "{path}"')
