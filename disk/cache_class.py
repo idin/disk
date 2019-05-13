@@ -1,54 +1,15 @@
+from .hard_folder_class import HardFolder
+from .Buffer_class import Buffer
+
 import atexit
 import functools
-from .hard_folder_class import HardFolder
-from slytherin.hash import hash_object
 import warnings
 
-
-class Dictionary:
-	def __init__(self):
-		self._dictionary = dict()
-
-	def __getitem__(self, item):
-		hashed_key = hash_object(item, base=64)
-		return self._dictionary[hashed_key][1]
-
-	def __setitem__(self, key, value):
-		hashed_key = hash_object(key, base=64)
-		self._dictionary[hashed_key] = (key, value)
-
-	def __contains__(self, item):
-		hashed_key = hash_object(item, base=64)
-		return hashed_key in self._dictionary
-
-	def __str__(self):
-		return str({
-			str(key_value[0]): key_value[1]
-			for hashed_key, key_value in self._dictionary.items()
-		})
-
-	def __repr__(self):
-		return str(self)
-
-	def __delitem__(self, key):
-		hashed_key = hash_object(key, base=64)
-		del self._dictionary[hashed_key]
-
-	def keys(self):
-		return [key_value[0] for hashed_key, key_value in self._dictionary.items()]
-
-	def pop(self, item):
-		hashed_key = hash_object(item, base=64)
-		return self._dictionary.pop(hashed_key)[1]
-
-	@property
-	def size(self):
-		return len(self._dictionary)
 
 class Cache:
 	def __init__(self, on_disk=True, path=None, buffer_max=10000):
 		self._on_disk = on_disk
-		self._buffer = Dictionary()
+		self._buffer = Buffer()
 		self._buffer_max = buffer_max
 		self._stats = {
 			'set_success': 0, 'get_success': 0, 'get_failure': 0, 'set_failure': 0, 'set_time': None, 'get_time': None
@@ -132,11 +93,11 @@ class Cache:
 			raise RuntimeError('Cannot empty the buffer! There is no hard_folder!')
 
 	def make_cached(
-			self, function, id=None, condition_function=None, sub_directory=None, key_args=True, key_kwargs=True
+			self, function, id=None, condition_function=None, if_error='warning', sub_directory=None,
+			key_args=True, key_kwargs=True
 	):
 		"""
 		:param callable function: function to be cached
-		:param Cache cache:
 		:param int or str id: a unique identifier for function
 		:param callable condition_function: a function that determines if the result is worthy of caching
 		:param str if_error: what to do if error happens: warning, error, print, ignore
@@ -147,14 +108,15 @@ class Cache:
 		if sub_directory is None:
 			return make_cached(
 				function=function, cache=self, id=id, condition_function=condition_function,
-				key_args=key_args, key_kwargs=key_kwargs
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs
 			)
 		else:
 			sub_path = self._hard_folder._path + sub_directory
 			sub_cache = self.__class__(path=sub_path.path, on_disk=self._on_disk)
 			self._children.append(sub_cache)
 			return make_cached(
-				function=function, cache=sub_cache, id=id, condition_function=condition_function
+				function=function, cache=sub_cache, id=id, condition_function=condition_function,
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs
 			)
 
 
