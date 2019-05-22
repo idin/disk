@@ -1,5 +1,5 @@
-from .hard_folder_class import HardFolder
-from .Buffer_class import Buffer
+from .HardFolder import HardFolder
+from .Buffer import Buffer
 
 import atexit
 import functools
@@ -7,7 +7,7 @@ import warnings
 
 
 class Cache:
-	def __init__(self, on_disk=True, path=None, buffer_max=10000):
+	def __init__(self, on_disk=True, path=None, buffer_max=1000):
 		self._on_disk = on_disk
 		self._buffer = Buffer()
 		self._buffer_max = buffer_max
@@ -92,6 +92,11 @@ class Cache:
 		else:
 			raise RuntimeError('Cannot empty the buffer! There is no hard_folder!')
 
+	def empty_all_buffers(self):
+		self.empty_buffer()
+		for child in self._children:
+			child.empty_all_buffers()
+
 	def make_cached(
 			self, function, id=None, condition_function=None, if_error='warning', sub_directory=None,
 			key_args=True, key_kwargs=True
@@ -172,8 +177,9 @@ def make_cached(
 		result = function(*args, **kwargs)
 		if condition_function is None:
 			cache[key] = result
-		elif condition_function(result, *args, **kwargs):
+		elif condition_function(result):
 			cache[key] = result
+
 		return result
 	wrapper.cache = cache
 	wrapper.empty_buffer = cache.empty_buffer

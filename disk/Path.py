@@ -153,12 +153,19 @@ class Path:
 
 	@property
 	def type(self):
+		"""
+		:rtype: str
+		"""
 		if self.is_file():
 			return 'file'
 		else:
 			return 'directory'
 
 	def __add__(self, other):
+		"""
+		:type other: Path or str
+		:rtype: Path
+		"""
 		if isinstance(other, str):
 			other_string = other
 		elif isinstance(other, self.__class__):
@@ -176,22 +183,53 @@ class Path:
 		return self.type, self.get_absolute()
 
 	def __lt__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() < other._sort_key()
 
 	def __gt__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() > other._sort_key()
 
 	def __le__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() <= other._sort_key()
 
 	def __ge__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() >= other._sort_key()
 
 	def __eq__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() == other._sort_key()
 
 	def __ne__(self, other):
+		"""
+		:type other: Path
+		:rtype: bool
+		"""
 		return self._sort_key() != other._sort_key()
+
+	def __contains__(self, item):
+		if isinstance(item, Path):
+			path = item.path
+		else:
+			path = item
+		return path in list_directory(path=self.path)
 
 	def list(self, show_size=None):
 		if show_size is not None:
@@ -241,6 +279,19 @@ class Path:
 
 	def load(self, method='pickle', mode='rb', echo=0):
 		return _unpickle(path=self.path, method=method, mode=mode, echo=echo)
+
+	def read_lines(self, name=None):
+		"""
+		:type name: str
+		:rtype: list[str]
+		"""
+		if name is None:
+			path = self.path
+		else:
+			path = (self + name).path
+		with open(path) as file:
+			content = file.readlines()
+		return content
 
 	# aliases
 	ls = list
