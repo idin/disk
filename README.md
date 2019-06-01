@@ -6,7 +6,7 @@ and true to object oriented principles.
 
 # Installation
 
-You can use pip to install Disk.
+You can use pip to install Disk:
 
 ```bash
 pip install disk

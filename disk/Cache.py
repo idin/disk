@@ -21,6 +21,15 @@ class Cache:
 			else:
 				self._hard_folder = HardFolder(path=path)
 			atexit.register(self.empty_buffer)
+		else:
+			self._hard_folder = None
+
+	@property
+	def hard_folder(self):
+		"""
+		:rtype: HardFolder
+		"""
+		return self._hard_folder
 
 	def __del__(self):
 		self.empty_buffer()
@@ -71,7 +80,7 @@ class Cache:
 
 	@property
 	def path(self):
-		return self._hard_folder._path.string
+		return self.hard_folder._path.string
 
 	@property
 	def statistics(self):
@@ -88,7 +97,8 @@ class Cache:
 		if self._on_disk:
 			keys = list(self._buffer.keys())
 			for key in keys:
-				self._hard_folder[key] = self._buffer.pop(key)
+				item_and_time = self._buffer.pop_item_and_time(key)
+				self.hard_folder.set_item(key=key, value=item_and_time[0], time=item_and_time[1])
 		else:
 			raise RuntimeError('Cannot empty the buffer! There is no hard_folder!')
 
@@ -106,6 +116,7 @@ class Cache:
 		:param int or str id: a unique identifier for function
 		:param callable condition_function: a function that determines if the result is worthy of caching
 		:param str if_error: what to do if error happens: warning, error, print, ignore
+		:param str sub_directory: name of a sub directory inside the cache directory to be used, optional
 		:param list[int] or bool key_args: either True/False for including/excluding all args in the hash key or a list of indices of args to be included
 		:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key or a list of the kwargs to be included
 		:rtype: callable
@@ -144,19 +155,20 @@ def make_cached(
 		raise TypeError('key_kwargs should be either boolean or list.')
 
 	if_error = if_error.lower()[0]
+
 	@functools.wraps(function)
 	def wrapper(*args, **kwargs):
-		if key_args == True:
-			args_in_key = args
-		elif isinstance(key_args, list):
+		if isinstance(key_args, list):
 			args_in_key = tuple(map(args.__getitem__, key_args))
+		elif key_args:
+			args_in_key = args
 		else:
 			args_in_key = None
 
-		if key_kwargs == True:
-			kwargs_in_key = kwargs
-		elif isinstance(key_kwargs, list):
+		if isinstance(key_kwargs, list):
 			kwargs_in_key = {key: kwargs[key] for key in key_kwargs}
+		elif key_kwargs:
+			kwargs_in_key = kwargs
 		else:
 			kwargs_in_key = None
 
@@ -177,7 +189,7 @@ def make_cached(
 		result = function(*args, **kwargs)
 		if condition_function is None:
 			cache[key] = result
-		elif condition_function(result):
+		elif condition_function(result=result, args=args, kwargs=kwargs):
 			cache[key] = result
 
 		return result
