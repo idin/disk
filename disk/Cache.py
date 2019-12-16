@@ -1,49 +1,74 @@
 from .HardFolder import HardFolder
-from .Buffer import Buffer
 
 import atexit
 import functools
 import warnings
+from zipfile import ZIP_DEFLATED
 
 
 class Cache:
-	def __init__(self, on_disk=True, path=None, buffer_max=1000):
-		self._on_disk = on_disk
-		self._buffer = Buffer()
-		self._buffer_max = buffer_max
+	def __init__(self, path):
+
+		if isinstance(path, self.__class__):
+			children = path._children.copy()
+			path = path.path
+		else:
+			children = {}
+
 		self._stats = {
 			'set_success': 0, 'get_success': 0, 'get_failure': 0, 'set_failure': 0, 'set_time': None, 'get_time': None
 		}
-		self._children = []
-		if on_disk:
-			if path is None:
-				raise ValueError('On-disk cache needs a path!')
-			else:
-				self._hard_folder = HardFolder(path=path)
-			atexit.register(self.empty_buffer)
-		else:
-			self._hard_folder = None
+		self._children = children
+
+		self._hard_folder = HardFolder(path=path)
+		atexit.register(self.hard_folder.save_keys)
+
+	_STATE_ATTRIBUTES_ = ['_stats', '_children', '_hard_folder']
+
+	def zip(self, zip_path=None, delete_directory=False, compression=ZIP_DEFLATED, echo=0):
+		self['_cache_children_'] = self._children
+		return self.hard_folder.zip(delete_directory=delete_directory, compression=compression, zip_path=zip_path, echo=echo)
+
+	@classmethod
+	def from_zip(cls, path, unzip_path=None, delete_original=False):
+		"""
+		:type path: str or Path or HardFolder or Cache
+		:type unzip_path: str or Path
+		:type delete_original: bool
+		:rtype: Cache
+		"""
+		hard_folder = HardFolder.from_zip(path=path, delete_original=delete_original, unzip_path=unzip_path)
+		result = cls(path=hard_folder)
+		result._children = result['_cache_children_']
+		try:
+			del result['_cache_children_']
+		except Exception as e:
+			print(e)
+		return result
+
+	def __getstate__(self):
+		return {key: getattr(self, key) for key in self._STATE_ATTRIBUTES_}
+
+	def __setstate__(self, state):
+		for key, value in state.items():
+			setattr(self, key, value)
+
+	def __hashkey__(self):
+		return self.__class__.__name__, self._hard_folder.__hashkey__()
 
 	@property
 	def hard_folder(self):
 		"""
-		:rtype: HardFolder
+		:rtype: HardFolder or Buffer
 		"""
 		return self._hard_folder
 
 	def __del__(self):
-		self.empty_buffer()
-		atexit.unregister(self.empty_buffer)
+		self.hard_folder.save_keys()
 
 	def __getitem__(self, item):
 		try:
-			if self._on_disk:
-				if item in self._buffer:
-					result = self._buffer[item]
-				else:
-					result = self._hard_folder[item]
-			else:
-				result = self._buffer[item]
+			result = self._hard_folder[item]
 		except Exception as e:
 			self._stats['get_failure'] += 1
 			raise e
@@ -53,34 +78,25 @@ class Cache:
 
 	def __setitem__(self, key, value):
 		try:
-			self._buffer[key] = value
+			self._hard_folder[key] = value
 		except Exception as e:
 			self._stats['set_failure'] += 1
 			raise e
-
-		if self._buffer.size > self._buffer_max:
-			self.empty_buffer()
 		self._stats['set_success'] += 1
 
 	def __contains__(self, item):
-		if item in self._buffer:
-			return True
-		elif self._on_disk:
-			return item in self._hard_folder
+		return item in self._hard_folder
 
 	def __delitem__(self, key):
-		if key in self._buffer:
-			del self._buffer[key]
-			if key in self._hard_folder:
-				del self._hard_folder[key]
-		elif key in self._hard_folder:
+
+		if key in self._hard_folder:
 			del self._hard_folder[key]
 		else:
-			raise KeyError(f'{key} does not exist in either buffer or hard folder!')
+			raise KeyError(f'{key} does not exist in cache!')
 
 	@property
 	def path(self):
-		return self.hard_folder._path.string
+		return self.hard_folder._path
 
 	@property
 	def statistics(self):
@@ -90,26 +106,9 @@ class Cache:
 				result[key] = value
 		return result
 
-	def empty_buffer(self):
-		"""
-		empties the buffer of cache
-		"""
-		if self._on_disk:
-			keys = list(self._buffer.keys())
-			for key in keys:
-				item_and_time = self._buffer.pop_item_and_time(key)
-				self.hard_folder.set_item(key=key, value=item_and_time[0], time=item_and_time[1])
-		else:
-			raise RuntimeError('Cannot empty the buffer! There is no hard_folder!')
-
-	def empty_all_buffers(self):
-		self.empty_buffer()
-		for child in self._children:
-			child.empty_all_buffers()
-
 	def make_cached(
 			self, function, id=None, condition_function=None, if_error='warning', sub_directory=None,
-			key_args=True, key_kwargs=True
+			key_args=True, key_kwargs=True, exclude_kwargs=None
 	):
 		"""
 		:param callable function: function to be cached
@@ -117,27 +116,34 @@ class Cache:
 		:param callable condition_function: a function that determines if the result is worthy of caching
 		:param str if_error: what to do if error happens: warning, error, print, ignore
 		:param str sub_directory: name of a sub directory inside the cache directory to be used, optional
-		:param list[int] or bool key_args: either True/False for including/excluding all args in the hash key or a list of indices of args to be included
-		:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key or a list of the kwargs to be included
+		:param list[int] or bool key_args: either True/False for including/excluding all args in the hash key
+		or a list of indices of args to be included
+		:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key
+		or a list of the kwargs to be included
+		:param str or list[str] or NoneType exclude_kwargs: exclude these arguments from hash key
 		:rtype: callable
 		"""
 		if sub_directory is None:
 			return make_cached(
 				function=function, cache=self, id=id, condition_function=condition_function,
-				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs
 			)
 		else:
-			sub_path = self._hard_folder._path + sub_directory
-			sub_cache = self.__class__(path=sub_path.path, on_disk=self._on_disk)
-			self._children.append(sub_cache)
+			sub_path = self.path + sub_directory
+			if sub_path.path in self._children:
+				sub_cache = self._children[sub_path.path]
+			else:
+				sub_cache = self.__class__(path=sub_path.path)
+			self._children[sub_path.path] = sub_cache
 			return make_cached(
 				function=function, cache=sub_cache, id=id, condition_function=condition_function,
-				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs
 			)
 
 
 def make_cached(
-		function, cache, id=0, condition_function=None, if_error='warning', key_args=True, key_kwargs=True
+		function, cache, id=0, condition_function=None, if_error='warning', key_args=True, key_kwargs=True,
+		exclude_kwargs=None
 ):
 	"""
 	:param callable function: function to be cached
@@ -145,8 +151,10 @@ def make_cached(
 	:param int or str id: a unique identifier for function
 	:param callable condition_function: a function that determines if the result is worthy of caching
 	:param str if_error: what to do if error happens: warning, error, print, ignore
-	:param list[int] or bool key_args: either True/False for including/excluding all args in the hash key or a list of indices of args to be included
-	:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key or a list of the kwargs to be included
+	:param list[int] or bool key_args: either True/False for including/excluding all args in the hash key or
+	a list of indices of args to be included
+	:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key or
+	a list of the kwargs to be included
 	:rtype: callable
 	"""
 	if not isinstance(key_args, (bool, list)):
@@ -154,10 +162,14 @@ def make_cached(
 	if not isinstance(key_kwargs, (bool, list)):
 		raise TypeError('key_kwargs should be either boolean or list.')
 
+	exclude_kwargs = exclude_kwargs or []
+	if isinstance(exclude_kwargs, str):
+		exclude_kwargs = [exclude_kwargs]
+
 	if_error = if_error.lower()[0]
 
 	@functools.wraps(function)
-	def wrapper(*args, **kwargs):
+	def wrapper(*args, update_cache=False, **kwargs):
 		if isinstance(key_args, list):
 			args_in_key = tuple(map(args.__getitem__, key_args))
 		elif key_args:
@@ -166,15 +178,15 @@ def make_cached(
 			args_in_key = None
 
 		if isinstance(key_kwargs, list):
-			kwargs_in_key = {key: kwargs[key] for key in key_kwargs}
+			kwargs_in_key = {key: kwargs[key] for key in key_kwargs if key not in exclude_kwargs}
 		elif key_kwargs:
-			kwargs_in_key = kwargs
+			kwargs_in_key = {key: value for key, value in kwargs.items() if key not in exclude_kwargs}
 		else:
 			kwargs_in_key = None
 
 		key = (id, function.__name__, function.__doc__, args_in_key, kwargs_in_key)
 
-		if key in cache:
+		if key in cache and not update_cache:
 			try:
 				return cache[key]
 			except EOFError as e:
@@ -187,13 +199,18 @@ def make_cached(
 				# else: ignore
 
 		result = function(*args, **kwargs)
+
 		if condition_function is None:
 			cache[key] = result
-		elif condition_function(result=result, args=args, kwargs=kwargs):
-			cache[key] = result
+		else:
+			condition_args = list(condition_function.__code__.co_varnames)[:condition_function.__code__.co_argcount]
+			condition_kwargs = {key: value for key, value in kwargs.items() if key in condition_args}
+			if 'result' in condition_args:
+				condition_kwargs['result'] = result
+			if condition_function(**condition_kwargs):
+				cache[key] = result
 
 		return result
 	wrapper.cache = cache
-	wrapper.empty_buffer = cache.empty_buffer
 
 	return wrapper

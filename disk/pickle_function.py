@@ -1,9 +1,12 @@
 import pickle as _pickle
 import dill as _dill
-import warnings
+from slytherin.immutability import Immutable, make_immutable
+
 
 def pickle(obj, path, method='pickle', mode='wb', echo=0):
 	echo = max(0, echo)
+	if isinstance(obj, Immutable):
+		obj = {'__immutable__':obj._original_object}
 	with open(file=path, mode=mode) as output_file:
 		try:
 			if method == 'dill':
@@ -11,8 +14,8 @@ def pickle(obj, path, method='pickle', mode='wb', echo=0):
 			else:
 				_pickle.dump(obj=obj, file=output_file, protocol=_pickle.HIGHEST_PROTOCOL)
 		except Exception as e:
-			warnings.warn(f'Error in pickling object: {obj} to "{path}" using the {method} method!')
-			raise e from e
+			print(f'Error in pickling object: "{obj}" of type "{type(obj)}" to "{path}" using the {method} method!')
+			raise e
 
 	if echo:
 		print(f'Pickled a {type(obj)} at "{path}"')
@@ -27,9 +30,12 @@ def unpickle(path, method='pickle', mode='rb', echo=0):
 			else:
 				obj = _pickle.load(file=input_file)
 		except Exception as e:
-			warnings.warn(f'Error in unpickling "{path}" using the {method} method!')
-			raise e from e
+			print(f'Error in unpickling "{path}" using the {method} method!')
+			raise e
 
 	if echo:
 		print(f'Unpickled a {type(obj)} from "{path}"')
+	if isinstance(obj, dict):
+		if '__immutable__' in obj:
+			return make_immutable(obj['__immutable__'])
 	return obj

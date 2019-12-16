@@ -2,17 +2,65 @@ from .Path import Path
 from slytherin.hash import hash_object
 from datetime import datetime
 import atexit
+from zipfile import ZIP_DEFLATED
 
 
 # HardFolder is a directory that acts like a dictionary, objects are saved to a directory and retrieved from it
 class HardFolder:
 	def __init__(self, path):
-		self._path = Path(string=path)
+		if isinstance(path, self.__class__):
+			self._path = path._path
+			self._items = path._items
+		else:
+			self._path = Path(string=path)
+			self._path.make_directory(ignore_if_exists=True)
+			self._items = {}
+
+		if self.keys_path.exists() and len(self._items) == 0:
+			self._items = self.keys_path.load(method='pickle')
+		atexit.register(self.save_keys)
+
+	_STATE_ATTRIBUTES_ = ['_path', '_items']
+
+	def __repr__(self):
+		return f'<HardFolder:{self._path.path}>'
+
+	def __str__(self):
+		return repr(self)
+
+	def __getstate__(self):
+		return {key: getattr(self, key) for key in self._STATE_ATTRIBUTES_}
+
+	def __setstate__(self, state):
+		for key, value in state.items():
+			setattr(self, key, value)
 		self._path.make_directory(ignore_if_exists=True)
-		self._items = {}
 		if self.keys_path.exists():
 			self._items = self.keys_path.load(method='pickle')
 		atexit.register(self.save_keys)
+
+	def __hashkey__(self):
+		return (self.__class__.__name__, self._path.path)
+
+	def zip(self, delete_directory=False, compression=ZIP_DEFLATED, zip_path=None, echo=0):
+		"""
+		:type delete_directory: bool
+		:type compression: int
+		:rtype: Path
+		"""
+		self.save_keys()
+		return self._path.zip(compression=compression, delete_original=delete_directory, zip_path=zip_path, echo=echo)
+
+	@classmethod
+	def from_zip(cls, path, delete_original=False, unzip_path=None):
+		"""
+		:type path: str or Path
+		:type delete_original: bool
+		:rtype: HardFolder
+		"""
+		zip_path = Path(string=path)
+		unzip_path = zip_path.unzip(delete_original=delete_original, unzip_path=unzip_path)
+		return cls(path=unzip_path)
 
 	@property
 	def keys_path(self):
@@ -36,7 +84,7 @@ class HardFolder:
 			if the_path.exists():
 				return the_path, 'dill'
 			else:
-				raise KeyError(f'The item: "{item}" does not exist in the Folder!')
+				raise KeyError(f'The item: "{item}" does not exist in {self}!')
 
 	def set_item(self, key, value, time):
 		self._items[hash_object(key, base=32)] = key

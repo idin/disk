@@ -7,7 +7,8 @@ from chronology import get_elapsed, get_now
 class Box:
 	def __init__(self, path, save_interval_seconds=60):
 		self._path = Path(string=path)
-		self._path.make_parent_directory(ignore_if_exists=True)
+		if not self._path.exists():
+			self._path.make_parent_directory(ignore_if_exists=True)
 		self._num_saved_items = None
 		self._dict = {}
 		self._save_interval_seconds = save_interval_seconds
@@ -15,22 +16,15 @@ class Box:
 		self.load(append=False)
 		atexit.register(self.save)
 
+	_STATE_ATTRIBUTES_ = ['_path', '_num_saved_items', '_dict', '_save_interval_seconds', '_save_time']
+
 	def __getstate__(self):
-		return {
-			'path': self._path,
-			'num_saved_items': self._num_saved_items,
-			'dict': self._dict,
-			'save_interval_seconds': self._save_interval_seconds,
-			'save_time': self._save_time
-		}
+		return {key: getattr(self, key) for key in self._STATE_ATTRIBUTES_}
 
 	def __setstate__(self, state):
-		self._path = state['path']
+		for key, value in state.items():
+			setattr(self, key, value)
 		self._path.make_parent_directory(ignore_if_exists=True)
-		self._num_saved_items = state['num_saved_items']
-		self._dict = state['dict']
-		self._save_interval_seconds = state['save_interval_seconds']
-		self._save_time = state['save_time']
 		self.load(append=True)
 		atexit.register(self.save)
 

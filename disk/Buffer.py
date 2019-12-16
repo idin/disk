@@ -6,6 +6,15 @@ class Buffer:
 	def __init__(self):
 		self._dictionary = dict()
 
+	def __getstate__(self):
+		return self._dictionary
+
+	def __setstate__(self, state):
+		self._dictionary = state
+
+	def __hashkey__(self):
+		return (self.__class__.__name__, id(self))
+
 	def __getitem__(self, item):
 		hashed_key = hash_object(item, base=64)
 		return self._dictionary[hashed_key][1]

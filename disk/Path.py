@@ -1,10 +1,24 @@
 from .pickle_function import pickle as _pickle
 from .pickle_function import unpickle as _unpickle
 from .individual_functions import *
+from .zip import zip_file, zip_directory, unzip
+from zipfile import ZIP_DEFLATED, is_zipfile
+
+from pathlib import Path as _Path
+
+
+def get_parent_directory(path):
+	return str(_Path(path).parent.absolute())
 
 
 class Path:
 	def __init__(self, string, show_size=False):
+		"""
+		:type string: str or Path
+		:type show_size: bool
+		"""
+		if isinstance(string, self.__class__):
+			string = string.string
 		self._string = string
 		self._size = None
 		self._show_size = show_size
@@ -32,37 +46,56 @@ class Path:
 		self._size = state['size']
 		self._show_size = state['show_size']
 
+	def __hashkey__(self):
+		return (self.__class__.__name__, self._string)
+
 	def get_absolute(self):
+		"""
+		:rtype: str
+		"""
 		return get_absolute_path(path=self.path)
 
 	@property
 	def absolute(self):
+		"""
+		:rtype: str
+		"""
 		return self.get_absolute()
 
 	@property
 	def absolute_path(self):
+		"""
+		:rtype: str
+		"""
 		return self.get_absolute()
 
 	@classmethod
 	def get_current_directory(cls, show_size=False):
+		"""
+		:rtype: Path
+		"""
 		return cls(string='.', show_size=show_size)
 
 	@property
 	def parent_directory(self):
-		result = self + '..'
-		if result.absolute_path != self.absolute_path:
-			result._show_absolute_path = True
-			return result
-		else:
-			return None
+		"""
+		:rtype: Path
+		"""
+		return self.__class__(string=get_parent_directory(self.absolute_path))
 
 	def __parents__(self):
+		"""
+		:rtype: list[Path]
+		"""
 		if self.parent_directory is not None:
 			return [self.parent_directory]
 		else:
 			return []
 
 	def __children__(self):
+		"""
+		:rtype: list[Path]
+		"""
 		if self.is_directory():
 			return self.list()
 		else:
@@ -73,24 +106,39 @@ class Path:
 
 	@property
 	def string(self):
+		"""
+		:rtype: str
+		"""
 		return self._string
 
 	@property
 	def path(self):
+		"""
+		:rtype: str
+		"""
 		return self.string
 
 	@property
 	def value(self):
+		"""
+		:rtype: str
+		"""
 		return self.string
 
 	@property
 	def name_and_extension(self):
+		"""
+		:rtype: str
+		"""
 		return get_basename(path=self.absolute_path)
 
 	full_name = name_and_extension
 
 	@property
 	def extension(self):
+		"""
+		:rtype: str
+		"""
 		extension_with_dot = os.path.splitext(self.path)[1]
 		if len(extension_with_dot) > 0:
 			return extension_with_dot[1:]
@@ -99,9 +147,15 @@ class Path:
 
 	@property
 	def name(self):
+		"""
+		:rtype: str
+		"""
 		return self.name_and_extension.rsplit('.', 1)[0]
 
 	def get_size_bytes(self):
+		"""
+		:rtype: int or float
+		"""
 		if self.is_file():
 			return get_file_size_bytes(path=self.path)
 		else:
@@ -109,29 +163,44 @@ class Path:
 
 	@property
 	def size_bytes(self):
+		"""
+		:rtype: int or float
+		"""
 		if self._size is None:
 			self._size = self.get_size_bytes()
 		return self._size
 
 	def get_size_kb(self, binary=True):
+		"""
+		:rtype: int or float
+		"""
 		if binary:
 			return self.size_bytes/(2**10)
 		else:
 			return self.size_bytes/1e3
 
 	def get_size_mb(self, binary=True):
+		"""
+		:rtype: int or float
+		"""
 		if binary:
 			return self.size_bytes/(2**20)
 		else:
 			return self.size_bytes/1e6
 
 	def get_size_gb(self, binary=True):
+		"""
+		:rtype: int or float
+		"""
 		if binary:
 			return self.size_bytes/(2**30)
 		else:
 			return self.size_bytes/1e6
 
 	def get_size(self, binary=True):
+		"""
+		:rtype: tuple
+		"""
 		main_unit = 'B' if binary else 'b'
 		if self.size_bytes <= 1e3:
 			return self.size_bytes, 'B'
@@ -143,9 +212,15 @@ class Path:
 			return self.get_size_gb(binary=binary), 'G' + main_unit
 
 	def exists(self):
+		"""
+		:rtype: bool
+		"""
 		return path_exists(path=self.path)
 
 	def is_file(self):
+		"""
+		:rtype: bool
+		"""
 		return path_is_file(path=self.path)
 
 	def is_directory(self):
@@ -232,6 +307,9 @@ class Path:
 		return path in list_directory(path=self.path)
 
 	def list(self, show_size=None):
+		"""
+		:rtype: list[Path]
+		"""
 		if show_size is not None:
 			self._show_size = show_size
 		result = [self+x for x in list_directory(path=self.path)]
@@ -241,10 +319,16 @@ class Path:
 
 	@property
 	def directories(self):
+		"""
+		:rtype: list[Path]
+		"""
 		return [x for x in self.list() if x.is_directory()]
 
 	@property
 	def files(self):
+		"""
+		:rtype: list[Path]
+		"""
 		return [x for x in self.list() if x.is_file()]
 
 	def get(self, full_name):
@@ -252,12 +336,13 @@ class Path:
 
 	def make_directory(self, name=None, ignore_if_exists=True):
 		if name:
-			path = (self+name).path
+			path = self+name
 		else:
-			path = self.path
+			path = self
 
-		make_dir(path=path, ignore_if_exists=ignore_if_exists)
-		return self
+		make_dir(path=path.path, ignore_if_exists=ignore_if_exists)
+
+		return path
 
 	def make_parent_directory(self, ignore_if_exists=True):
 		if self.parent_directory:
@@ -275,6 +360,8 @@ class Path:
 		delete_dir(path=(self+name).path)
 
 	def save(self, obj, method='pickle', mode='wb', echo=0):
+		if not self.parent_directory.exists():
+			self.parent_directory.make_dir()
 		_pickle(path=self.path, obj=obj, method=method, mode=mode, echo=echo)
 
 	def load(self, method='pickle', mode='rb', echo=0):
@@ -292,6 +379,62 @@ class Path:
 		with open(path) as file:
 			content = file.readlines()
 		return content
+
+	def zip(self, zip_path=None, compression=ZIP_DEFLATED, delete_original=False, echo=0):
+		"""
+		:type zip_path: NoneType or Path or str
+		:type compression: int
+		:rtype: Path
+		"""
+		if isinstance(zip_path, self.__class__):
+			zip_path = zip_path.path
+
+		if self.is_file():
+			zip_path = zip_path or self.path + '.zip'
+			result = zip_file(path=self.path, compression=compression, zip_path=zip_path, echo=echo)
+		else:
+			zip_path = zip_path or self.path + '.dir.zip'
+			result = zip_directory(path=self.path, compression=compression, zip_path=zip_path, echo=echo)
+
+		if delete_original:
+			self.delete()
+
+		return self.__class__(string=result)
+
+	def unzip(self, unzip_path=None, delete_original=False):
+		"""
+		:type unzip_path: str or NoneType or Path
+		:rtype: Path
+		"""
+		if isinstance(unzip_path, self.__class__):
+			unzip_path = unzip_path.path
+
+		if unzip_path is None:
+			directory = self.parent_directory
+		else:
+			directory = Path(unzip_path)
+
+		zipped_directory_extension = '.dir.zip'
+		zipped_file_extension = '.zip'
+		if self.name_and_extension.endswith(zipped_directory_extension):
+			unzip_path = directory + self.path[:-len(zipped_directory_extension)]
+		elif self.name_and_extension.endswith(zipped_file_extension):
+			unzip_path = directory + self.path[:-len(zipped_file_extension)]
+		else:
+			raise ValueError('unknown extension!')
+
+		unzip(path=self.path, unzip_path=directory.path)
+
+		if delete_original:
+			self.delete()
+
+		return self.__class__(string=unzip_path)
+
+	def is_zipfile(self):
+		"""
+		:rtype: bool
+		"""
+		return is_zipfile(self.path)
 
 	# aliases
 	ls = list
