@@ -8,7 +8,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
 	name='disk',
-	version='0.1.4',
+	version='2019.12.29.7',
 	description='Python library for interacting with the file system',
 	long_description=long_description,
 	long_description_content_type='text/markdown',
@@ -17,7 +17,7 @@ setup(
 	author_email='py@idin.ca',
 	license='MIT',
 	packages=find_packages(exclude=("jupyter_tests", ".idea", ".git")),
-	install_requires=['dill', 'send2trash', 'slytherin'],
+	install_requires=['dill', 'send2trash', 'chronometry', 'slytherin'],
 	python_requires='~=3.6',
 	zip_safe=False
 )

@@ -4,6 +4,30 @@ import atexit
 import functools
 import warnings
 from zipfile import ZIP_DEFLATED
+from chronometry import get_now, get_elapsed
+
+class TimedObject:
+	def __init__(self, obj):
+		self._obj = obj
+		self._time = get_now()
+
+	@property
+	def obj(self):
+		return self._obj
+
+	@property
+	def time(self):
+		return self._time
+
+	def is_expired(self, expire_in):
+		value, unit = expire_in.split()
+		return get_elapsed(start=self.time, end=get_now(), unit=unit) >= float(value)
+
+	def __getstate__(self):
+		return self.obj, self.time
+
+	def __setstate__(self, state):
+		self._obj, self._time = state
 
 
 class Cache:
@@ -108,7 +132,7 @@ class Cache:
 
 	def make_cached(
 			self, function, id=None, condition_function=None, if_error='warning', sub_directory=None,
-			key_args=True, key_kwargs=True, exclude_kwargs=None
+			key_args=True, key_kwargs=True, exclude_kwargs=None, expire_in=None
 	):
 		"""
 		:param callable function: function to be cached
@@ -121,12 +145,14 @@ class Cache:
 		:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key
 		or a list of the kwargs to be included
 		:param str or list[str] or NoneType exclude_kwargs: exclude these arguments from hash key
+		:param NoneType or str expire_in: if provided the cached value will expire, e.g., '2 days', '6 months'
 		:rtype: callable
 		"""
 		if sub_directory is None:
 			return make_cached(
 				function=function, cache=self, id=id, condition_function=condition_function,
-				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs,
+				expire_in=expire_in
 			)
 		else:
 			sub_path = self.path + sub_directory
@@ -137,13 +163,14 @@ class Cache:
 			self._children[sub_path.path] = sub_cache
 			return make_cached(
 				function=function, cache=sub_cache, id=id, condition_function=condition_function,
-				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs
+				if_error=if_error, key_args=key_args, key_kwargs=key_kwargs, exclude_kwargs=exclude_kwargs,
+				expire_in=expire_in
 			)
 
 
 def make_cached(
 		function, cache, id=0, condition_function=None, if_error='warning', key_args=True, key_kwargs=True,
-		exclude_kwargs=None
+		exclude_kwargs=None, expire_in=None
 ):
 	"""
 	:param callable function: function to be cached
@@ -155,6 +182,7 @@ def make_cached(
 	a list of indices of args to be included
 	:param list[str] or bool key_kwargs: either True/False for including/excluding all kwargs in the hash key or
 	a list of the kwargs to be included
+	:param NoneType or str expire_in: if provided the cached value will expire, e.g., '2 days', '6 months'
 	:rtype: callable
 	"""
 	if not isinstance(key_args, (bool, list)):
@@ -188,7 +216,14 @@ def make_cached(
 
 		if key in cache and not update_cache:
 			try:
-				return cache[key]
+				result = cache[key]
+
+				if isinstance(result, TimedObject):
+					if not result.is_expired(expire_in=expire_in):
+						return result.obj
+				else:
+					return result
+
 			except EOFError as e:
 				if if_error == 'w':  # warning
 					warnings.warn(str(e))
@@ -201,13 +236,27 @@ def make_cached(
 		result = function(*args, **kwargs)
 
 		if condition_function is None:
-			cache[key] = result
+			# save the result regardless
+			should_save_in_cache = True
+
 		else:
+			# run condition function
 			condition_args = list(condition_function.__code__.co_varnames)[:condition_function.__code__.co_argcount]
 			condition_kwargs = {key: value for key, value in kwargs.items() if key in condition_args}
+
+			# include the result in the arguments for condition function if necessary
 			if 'result' in condition_args:
 				condition_kwargs['result'] = result
+
 			if condition_function(**condition_kwargs):
+				should_save_in_cache = True
+			else:
+				should_save_in_cache = False
+
+		if should_save_in_cache:
+			if expire_in is not None:
+				cache[key] = TimedObject(obj=result)
+			else:
 				cache[key] = result
 
 		return result

@@ -1,6 +1,6 @@
 import os
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
-from interaction import ProgressBar
+from chronometry.progress import ProgressBar
 
 
 def zip_directory(path, zip_path, compression=ZIP_DEFLATED, echo=0):

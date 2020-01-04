@@ -1,6 +1,6 @@
-from disk import Path
+from .Path import Path
 import atexit
-from chronology import get_elapsed, get_now
+from chronometry import get_elapsed, get_now
 
 
 # Box is an object that saves itself to the disk

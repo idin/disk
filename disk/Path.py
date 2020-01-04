@@ -2,9 +2,12 @@ from .pickle_function import pickle as _pickle
 from .pickle_function import unpickle as _unpickle
 from .individual_functions import *
 from .zip import zip_file, zip_directory, unzip
+import re
 from zipfile import ZIP_DEFLATED, is_zipfile
 
 from pathlib import Path as _Path
+import warnings
+import os
 
 
 def get_parent_directory(path):
@@ -117,6 +120,15 @@ class Path:
 		:rtype: str
 		"""
 		return self.string
+
+	@property
+	def pretty_path(self):
+		"""
+		:rtype: str
+		"""
+		backslashes_replaced = self.string.replace('\\', '/')
+		multiple_slashes_removed = re.sub('/+', '/', backslashes_replaced)
+		return multiple_slashes_removed
 
 	@property
 	def value(self):
@@ -365,20 +377,49 @@ class Path:
 		_pickle(path=self.path, obj=obj, method=method, mode=mode, echo=echo)
 
 	def load(self, method='pickle', mode='rb', echo=0):
+		"""
+		:param str method: pickle or dill
+		:param str mode: 'rb' or ...
+		:param bool or int echo:
+		:rtype: object
+		"""
 		return _unpickle(path=self.path, method=method, mode=mode, echo=echo)
 
-	def read_lines(self, name=None):
+	def read_lines(self, name=None, encoding='utf8'):
 		"""
-		:type name: str
+		:type name: str or NoneType
+		:type encoding: str
 		:rtype: list[str]
 		"""
 		if name is None:
 			path = self.path
 		else:
 			path = (self + name).path
-		with open(path) as file:
-			content = file.readlines()
+		try:
+			with open(path, encoding=encoding) as file:
+				content = file.readlines()
+		except Exception as e:
+			warnings.warn(f'error reading file {path}')
+			raise e
 		return content
+
+	def write_lines(self, lines, name=None, append=False, encoding='utf8'):
+		"""
+		:type lines: list[str]
+		:type name: str or NoneType
+		:type append: bool
+		:type encoding: str
+		"""
+		if name is None:
+			path = self.path
+		else:
+			path = (self + name).path
+		try:
+			with open(path, mode='a' if append else 'w', encoding=encoding) as file:
+				file.writelines(lines)
+		except Exception as e:
+			warnings.warn(f'error writing file {path}')
+			raise e
 
 	def zip(self, zip_path=None, compression=ZIP_DEFLATED, delete_original=False, echo=0):
 		"""
@@ -435,6 +476,16 @@ class Path:
 		:rtype: bool
 		"""
 		return is_zipfile(self.path)
+
+	def run(self, command):
+		if not self.is_directory():
+			raise TypeError(f'{self.absolute} is not a directory')
+		else:
+			working_directory = os.getcwd()
+			os.chdir(self.absolute)
+			result = os.system(command)
+			os.chdir(working_directory)
+			return result
 
 	# aliases
 	ls = list
