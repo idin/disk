@@ -116,8 +116,8 @@ To save a Python object as a **Pickle** file using the *pickle* or *dill* librar
 *save* function of the *Path* which saves the object right at the location of *Path*.
 ```python
 my_list = [1, 2, 3]
-Path('my_list.pickle').save(method='pickle')
-Path('my_list.dill').save(method='dill')
+Path('my_list.pickle').save(my_list, method='pickle')
+Path('my_list.dill').save(my_list, method='dill')
 ```
 
 
