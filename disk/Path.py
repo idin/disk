@@ -243,7 +243,9 @@ class Path:
 		"""
 		:rtype: str
 		"""
-		if self.is_file():
+		if not self.exists():
+			return 'nonexistent path'
+		elif self.is_file():
 			return 'file'
 		else:
 			return 'directory'
