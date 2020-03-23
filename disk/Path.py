@@ -1,10 +1,15 @@
 from .pickle_function import pickle as _pickle
 from .pickle_function import unpickle as _unpickle
 from .individual_functions import *
-from .zip import zip_file, zip_directory, unzip
-import re
-from zipfile import ZIP_DEFLATED, is_zipfile
+from .zip import zip_file
+from .zip import zip_directory
+from .zip import unzip
+from .get_creation_date import get_creation_date
+from .get_creation_date import get_modification_date
 
+import re
+from zipfile import ZIP_DEFLATED
+from zipfile import is_zipfile
 from pathlib import Path as _Path
 import warnings
 import os
@@ -20,8 +25,8 @@ class Path:
 		:type string: str or Path
 		:type show_size: bool
 		"""
-		if isinstance(string, self.__class__):
-			string = string.string
+		if isinstance(string, self.__class__) or not isinstance(string, str):
+			string = string.path
 		self._string = string
 		self._size = None
 		self._show_size = show_size
@@ -50,7 +55,14 @@ class Path:
 		self._show_size = state['show_size']
 
 	def __hashkey__(self):
-		return (self.__class__.__name__, self._string)
+		if self.exists():
+			if self.is_file():
+				return self.__class__.__name__, 1, self.size_bytes, self.creation_date, self.modification_date
+			else:
+				return self.__class__.__name__, 2, [x.__hashkey__() for x in self.list(show_size=False)]
+
+		else:
+			return self.__class__.__name__, 0, self._string
 
 	def get_absolute(self):
 		"""
@@ -163,6 +175,14 @@ class Path:
 		:rtype: str
 		"""
 		return self.name_and_extension.rsplit('.', 1)[0]
+
+	@property
+	def creation_date(self):
+		return get_creation_date(self.path)
+
+	@property
+	def modification_date(self):
+		return get_modification_date(self.path)
 
 	def get_size_bytes(self):
 		"""
