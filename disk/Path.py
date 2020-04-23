@@ -283,7 +283,7 @@ class Path:
 			raise TypeError(f'{other} is a {type(other)} but it should either be string or {self.__class__}')
 		self_string = '' if self.string == '.' else self.string
 
-		return self.__class__(
+		return Path(
 			string=os.path.join(self_string, other_string),
 			show_size=self._show_size
 		)
