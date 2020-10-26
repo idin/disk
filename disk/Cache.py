@@ -6,6 +6,7 @@ import warnings
 from zipfile import ZIP_DEFLATED
 from chronometry import get_now, get_elapsed
 
+
 class TimedObject:
 	def __init__(self, obj):
 		self._obj = obj

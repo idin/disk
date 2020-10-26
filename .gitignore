@@ -4,3 +4,8 @@ dist
 *.lucy
 *.lucy
 *.lucy
+*.lucy
+.idea
+disk/__pycache__
+disk_lucifer_to_pypi.ipynb
+.ipynb_checkpoints

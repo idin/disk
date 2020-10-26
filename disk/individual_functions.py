@@ -2,6 +2,7 @@ import os
 import os.path
 from send2trash import send2trash
 import shutil
+import errno
 
 
 def get_basename(path):
@@ -60,11 +61,15 @@ def delete_dir(path):
 
 
 def make_dir(path, ignore_if_exists=True):
-	if ignore_if_exists:
-		if not path_exists(path=path):
-			os.mkdir(path=path)
-	else:
-		os.mkdir(path=path)
+	if not ignore_if_exists or not path_exists(path=path):
+		# os.mkdir(path=path)
+		try:
+			os.makedirs(path)
+		except OSError as exc:  # Python ≥ 2.5
+			if exc.errno == errno.EEXIST and os.path.isdir(path):
+				pass
+			else:
+				raise exc
 
 
 def get_path(directory, file):

@@ -1,6 +1,10 @@
 import pickle as _pickle
 import dill as _dill
 from slytherin.immutability import Immutable, make_immutable
+from .individual_functions import get_file_size_bytes
+from .individual_functions import path_exists
+from .individual_functions import delete
+from .exceptions import SaveError
 
 
 def pickle(obj, path, method='pickle', mode='wb', echo=0):
@@ -16,6 +20,13 @@ def pickle(obj, path, method='pickle', mode='wb', echo=0):
 		except Exception as e:
 			print(f'Error in pickling object: "{obj}" of type "{type(obj)}" to "{path}" using the {method} method!')
 			raise e
+
+	if not path_exists(path):
+		raise SaveError('File was not saved!')
+
+	if get_file_size_bytes(path) == 0:
+		delete(path)
+		raise SaveError('Error in pickling object: empty file was deleted!')
 
 	if echo:
 		print(f'Pickled a {type(obj)} at "{path}"')
