@@ -8,7 +8,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
 	name='disk',
-	version='2020.4.6',
+	version='2020.9.18.2',
 	description='Python library for interacting with the file system',
 	long_description=long_description,
 	long_description_content_type='text/markdown',
