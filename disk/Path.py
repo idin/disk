@@ -29,16 +29,16 @@ def get_parent_directory(path):
 
 
 class Path:
-	def __init__(self, string, show_size=False):
+	def __init__(self, path, show_size=False):
 		"""
-		:type string: str or Path
+		:type path: str or Path
 		:type show_size: bool
 		"""
-		string = string or '.'
+		path = path or '.'
 
-		if isinstance(string, self.__class__) or not isinstance(string, str):
-			string = string.path
-		self._string = string
+		if isinstance(path, self.__class__) or not isinstance(path, str):
+			path = path.path
+		self._path = path
 		self._size = None
 		self._show_size = show_size
 
@@ -89,7 +89,7 @@ class Path:
 				new_directory = self.parent_directory
 
 			new_directory = Path(new_directory)
-			new_path = new_directory + new_name
+			new_path = new_directory / new_name
 
 		if not new_directory.exists():
 			new_directory.make_dir()
@@ -100,7 +100,7 @@ class Path:
 			raise PathExistsError(f'"{old_path}" cannot be renamed to "{new_path.absolute}" because it already exists!')
 
 		shutil.move(self.absolute_path, new_path.absolute_path)
-		self._string = new_path.absolute_path
+		self._path = new_path.absolute_path
 		if not self.exists():
 			raise RenameError(f'could not rename "{old_path}" to "{self.absolute}"')
 		return self
@@ -119,7 +119,7 @@ class Path:
 			new_directory = Path(new_directory)
 			if not new_directory.exists():
 				raise DirectoryNotFoundError(new_directory)
-			new_path = new_directory + self.name_and_extension
+			new_path = new_directory / self.name_and_extension
 
 		elif new_path is not None and new_directory is None:
 			new_path = Path(new_path)
@@ -159,22 +159,22 @@ class Path:
 		return self.__repr__()
 
 	def __repr__(self):
-		string = self.name_and_extension
+		name_and_ext = self.name_and_extension
 		if self._show_size:
 			size, unit = self.get_size()
-			return f'{self.type}: {string} - {round(size, 3)} {unit}'
+			return f'{self.type}: {name_and_ext} - {round(size, 3)} {unit}'
 		else:
-			return f'{self.type}: {string}'
+			return f'{self.type}: {name_and_ext}'
 
 	def __getstate__(self):
 		return {
-			'string': self._string,
+			'string': self._path,
 			'size': self._size,
 			'show_size': self._show_size
 		}
 
 	def __setstate__(self, state):
-		self._string = state['string']
+		self._path = state['string']
 		self._size = state['size']
 		self._show_size = state['show_size']
 
@@ -186,7 +186,7 @@ class Path:
 				return self.__class__.__name__, 2, [x.__hashkey__() for x in self.list(show_size=False)]
 
 		else:
-			return self.__class__.__name__, 0, self._string
+			return self.__class__.__name__, 0, self._path
 
 	def get_absolute(self):
 		"""
@@ -213,7 +213,7 @@ class Path:
 		"""
 		:rtype: Path
 		"""
-		return cls(string='.', show_size=show_size)
+		return cls(path='.', show_size=show_size)
 
 	def get_parent_directory(self, absolute=False):
 		"""
@@ -221,11 +221,11 @@ class Path:
 		:rtype: Path
 		"""
 		if absolute:
-			return Path(string=get_parent_directory(self.absolute_path))
+			return Path(path=get_parent_directory(self.absolute_path))
 		else:
-			string_except_name_and_extension = self._string[:-len(self.name_and_extension)]
+			string_except_name_and_extension = self._path[:-len(self.name_and_extension)]
 			if len(string_except_name_and_extension) > 0:
-				return Path(string=string_except_name_and_extension)
+				return Path(path=string_except_name_and_extension)
 			else:
 				return self.get_current_directory(show_size=self._show_size)
 
@@ -258,25 +258,18 @@ class Path:
 		return self.absolute_path
 
 	@property
-	def string(self):
-		"""
-		:rtype: str
-		"""
-		return self._string
-
-	@property
 	def path(self):
 		"""
 		:rtype: str
 		"""
-		return self.string
+		return self._path
 
 	@property
 	def pretty_path(self):
 		"""
 		:rtype: str
 		"""
-		backslashes_replaced = self.string.replace('\\', '/')
+		backslashes_replaced = self.path.replace('\\', '/')
 		multiple_slashes_removed = re.sub('/+', '/', backslashes_replaced)
 		return multiple_slashes_removed
 
@@ -285,7 +278,7 @@ class Path:
 		"""
 		:rtype: str
 		"""
-		return self.string
+		return self.path
 
 	@property
 	def name_and_extension(self):
@@ -416,13 +409,13 @@ class Path:
 		if isinstance(other, str):
 			other_string = other
 		elif isinstance(other, self.__class__):
-			other_string = other.string
+			other_string = other.path
 		else:
 			raise TypeError(f'{other} is a {type(other)} but it should either be string or {self.__class__}')
-		self_string = '' if self.string == '.' else self.string
+		self_path = '' if self.path == '.' else self.path
 
 		return Path(
-			string=os.path.join(self_string, other_string),
+			path=os.path.join(self_path, other_string),
 			show_size=self._show_size
 		)
 
@@ -431,10 +424,11 @@ class Path:
 		:type other: str
 		:rtype: S3Path
 		"""
+
 		if isinstance(other, str):
 			if other.startswith('.'):  # other is an extension
 				left = self._path.rstrip('/')
-				return self.__class__(s3=self.s3, path=f'{left}{other}')
+				return self.__class__(path=f'{left}{other}', show_size=self._show_size)
 			else:
 				return self.__truediv__(other)
 		else:
@@ -507,7 +501,7 @@ class Path:
 		"""
 		if show_size is not None:
 			self._show_size = show_size
-		result = [self+x for x in list_directory(path=self.path)]
+		result = [self / x for x in list_directory(path=self.path)]
 		result = [x for x in result if x.name != '']
 		result.sort()
 		return result
@@ -531,7 +525,7 @@ class Path:
 
 	def make_directory(self, name=None, ignore_if_exists=True, echo=0):
 		if name:
-			path = self+name
+			path = self / name
 		else:
 			path = self
 
@@ -548,7 +542,7 @@ class Path:
 
 	def delete(self, name=None, echo=0):
 		if name:
-			to_delete = self + name
+			to_delete = self / name
 		else:
 			to_delete = self
 		if echo:
@@ -556,12 +550,12 @@ class Path:
 		delete(path=to_delete.path)
 
 	def delete_directory(self, name):
-		delete_dir(path=(self+name).path)
+		delete_dir(path=(self / name).path)
 
 	def save(self, obj, method='pickle', mode='wb', echo=0):
 		path = self.path
 		if not path.endswith('.pickle'):
-			path += '.pickle'
+			path = f'{path}.pickle'
 
 		if not self.parent_directory.exists():
 			self.parent_directory.make_dir()
@@ -586,7 +580,7 @@ class Path:
 		if name is None:
 			path = self.path
 		else:
-			path = (self + name).path
+			path = (self / name).path
 		try:
 			with open(path, encoding=encoding) as file:
 				content = file.readlines()
@@ -605,7 +599,7 @@ class Path:
 		if name is None:
 			path = self.path
 		else:
-			path = (self + name).path
+			path = (self / name).path
 		try:
 			with open(path, mode='a' if append else 'w', encoding=encoding) as file:
 				file.writelines(lines)
@@ -623,16 +617,16 @@ class Path:
 			zip_path = zip_path.path
 
 		if self.is_file():
-			zip_path = zip_path or self.path + '.zip'
+			zip_path = zip_path or f'{self.path}.zip'
 			result = zip_file(path=self.path, compression=compression, zip_path=zip_path, echo=echo)
 		else:
-			zip_path = zip_path or self.path + '.dir.zip'
+			zip_path = zip_path or f'{self.path}.dir.zip'
 			result = zip_directory(path=self.path, compression=compression, zip_path=zip_path, echo=echo)
 
 		if delete_original:
 			self.delete()
 
-		return Path(string=result)
+		return Path(path=result)
 
 	def unzip(self, unzip_path=None, delete_original=False):
 		"""
@@ -650,9 +644,9 @@ class Path:
 		zipped_directory_extension = '.dir.zip'
 		zipped_file_extension = '.zip'
 		if self.name_and_extension.endswith(zipped_directory_extension):
-			unzip_path = directory + self.path[:-len(zipped_directory_extension)]
+			unzip_path = directory / self.path[:-len(zipped_directory_extension)]
 		elif self.name_and_extension.endswith(zipped_file_extension):
-			unzip_path = directory + self.path[:-len(zipped_file_extension)]
+			unzip_path = directory / self.path[:-len(zipped_file_extension)]
 		else:
 			raise ValueError('unknown extension!')
 
@@ -661,7 +655,7 @@ class Path:
 		if delete_original:
 			self.delete()
 
-		return Path(string=unzip_path)
+		return Path(path=unzip_path)
 
 	def is_zipfile(self):
 		"""
@@ -806,7 +800,7 @@ class Path:
 				continue
 
 			elif name not in self_files:
-				self_file = self + name
+				self_file = self / name
 				if ignore_function(self_file):
 					continue
 				else:
@@ -835,7 +829,7 @@ class Path:
 				continue
 
 			elif name not in self_directories:
-				self_directory = self + name
+				self_directory = self / name
 				if ignore_function is not None and ignore_function(self_directory):
 					continue
 

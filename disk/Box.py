@@ -6,7 +6,7 @@ from chronometry import get_elapsed, get_now
 # Box is an object that saves itself to the disk
 class Box:
 	def __init__(self, path, save_interval_seconds=60):
-		self._path = Path(string=path)
+		self._path = Path(path=path)
 		if not self._path.exists():
 			self._path.make_parent_directory(ignore_if_exists=True)
 		self._num_saved_items = None

@@ -12,7 +12,7 @@ class HardFolder:
 			self._path = path._path
 			self._items = path._items
 		else:
-			self._path = Path(string=path)
+			self._path = Path(path=path)
 			self._path.make_directory(ignore_if_exists=True)
 			self._items = {}
 
@@ -58,7 +58,7 @@ class HardFolder:
 		:type delete_original: bool
 		:rtype: HardFolder
 		"""
-		zip_path = Path(string=path)
+		zip_path = Path(path=path)
 		unzip_path = zip_path.unzip(delete_original=delete_original, unzip_path=unzip_path)
 		return cls(path=unzip_path)
 
