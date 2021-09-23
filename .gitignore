@@ -9,3 +9,4 @@ dist
 disk/__pycache__
 disk_lucifer_to_pypi.ipynb
 .ipynb_checkpoints
+.DS_Store
