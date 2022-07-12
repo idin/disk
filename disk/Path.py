@@ -562,14 +562,17 @@ class Path:
 		_pickle(path=path, obj=obj, method=method, mode=mode, echo=echo)
 		return path
 
-	def load(self, method='pickle', mode='rb', echo=0):
+	def load(self, method='pickle', mode='rb', echo=0, spark=None):
 		"""
 		:param str method: pickle or dill
 		:param str mode: 'rb' or ...
 		:param bool or int echo:
 		:rtype: object
 		"""
-		return _unpickle(path=self.path, method=method, mode=mode, echo=echo)
+		if method == 'pickle':
+			return _unpickle(path=self.path, method=method, mode=mode, echo=echo)
+		else:
+			raise ValueError(f'method "{method}" is not supported by Path.load')
 
 	def read_lines(self, name=None, encoding='utf8'):
 		"""
@@ -588,6 +591,18 @@ class Path:
 			warnings.warn(f'error reading file {path}')
 			raise e
 		return content
+
+	def write(self, text, name=None, encoding='utf8'):
+		if name is None:
+			path = self.path
+		else:
+			path = (self / name).path
+		try:
+			with open(path, mode='w', encoding=encoding) as file:
+				file.write(text)
+		except Exception as e:
+			warnings.warn(f'error writing file {path}')
+			raise e
 
 	def write_lines(self, lines, name=None, append=False, encoding='utf8'):
 		"""
@@ -848,6 +863,7 @@ class Path:
 	dir = list
 	md = make_directory
 	make_dir = make_directory
+	mkdir = make_directory
 	del_dir = delete_directory
 	delete_dir = delete_directory
 	pickle = save
@@ -857,3 +873,4 @@ class Path:
 	is_same_directory = is_the_same_directory
 	is_the_same_dir = is_the_same_directory
 	is_same_dir = is_same_directory
+	is_dir = is_directory

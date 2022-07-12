@@ -47,7 +47,7 @@ def delete(path):
 
 	# path should exist
 	if path_exists(path=path):
-		send2trash(path=path)
+		send2trash(path)
 	else:
 		raise FileNotFoundError(f'The path "{path}" does not exist!')
 

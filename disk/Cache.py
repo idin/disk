@@ -35,7 +35,7 @@ class Cache:
 	def __init__(self, path):
 
 		if isinstance(path, self.__class__):
-			children = path._children.copy()
+			children = path.children.copy()
 			path = path.path
 		else:
 			children = {}
@@ -49,6 +49,13 @@ class Cache:
 		atexit.register(self.hard_folder.save_keys)
 
 	_STATE_ATTRIBUTES_ = ['_stats', '_children', '_hard_folder']
+
+	@property
+	def children(self):
+		"""
+		:rtype: dict[str, Cache]
+		"""
+		return self._children
 
 	def zip(self, zip_path=None, delete_directory=False, compression=ZIP_DEFLATED, echo=0):
 		self['_cache_children_'] = self._children
